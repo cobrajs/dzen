@@ -73,6 +73,9 @@ typedef struct _CLICK_A {
 	int end_y;
 	Window win;		//(line)window to which the action is attached
 	char cmd[1024];
+	int internal; // True if the command is a dzen command
+	int (*internal_cmd)(char **);
+	char * internal_opt;
 } click_a;
 
 typedef struct _SENS_PER_WINDOW {

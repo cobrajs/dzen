@@ -711,7 +711,19 @@ handle_xev(void) {
 						(ev.xbutton.y >=  w.sens_areas[i].start_y &&
 						ev.xbutton.y <=  w.sens_areas[i].end_y) &&
 						w.sens_areas[i].active) {
-					spawn(w.sens_areas[i].cmd);
+					if (w.sens_areas[i].internal) {
+						if (w.sens_areas[i].internal_cmd) {
+							char *opts[MAXOPTIONS];
+							if (w.sens_areas[i].internal_opt) {
+								opts[0] = w.sens_areas[i].internal_opt;
+							} else {
+								opts[0] = NULL;
+							}
+							w.sens_areas[i].internal_cmd(opts);
+						}
+					} else {
+						spawn(w.sens_areas[i].cmd);
+					}
 					sa_clicked++;
 					break;
 				}
@@ -1043,7 +1055,7 @@ main(int argc, char *argv[]) {
 		else if(!strncmp(argv[i], "-dock", 6))
 			use_ewmh_dock = 1;
 		else if(!strncmp(argv[i], "-v", 3)) {
-			printf("dzen-"VERSION", (C)opyright 2007-2009 Robert Manea\n");
+			printf("dzen-\"VERSION\", (C)opyright 2007-2009 Robert Manea\n");
 			printf(
 			"Enabled optional features: "
 #ifdef DZEN_XMP

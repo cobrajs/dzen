@@ -19,6 +19,7 @@
 #define MAX_ICON_CACHE 32
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
+#define MIN(a,b) ((a)<(b)?(a):(b))
 #define LNR2WINDOW(lnr) lnr==-1?0:1
 
 typedef struct ICON_C {
@@ -373,6 +374,8 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 	int block_width = -1;
 	/* clickable area y tracking */
 	int max_y=-1;
+	/* current clickable area tracking */
+	click_a *current_area;
 
 	/* temp buffers */
 	char lbuf[MAX_LINE_LEN], *rbuf = NULL;
@@ -562,6 +565,8 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 								py += recty;
 							recty =	recty == 0 ? (dzen.line_height - recth)/2 :
 								(dzen.line_height - recth)/2 + recty;
+							if (current_area) 
+								(*current_area).start_y = MIN((*current_area).start_y, recty);
 							px += !pos_is_fixed ? rectx : 0;
 							setcolor(&pm, px, rectw, lastfg, lastbg, reverse, nobg);
 
@@ -571,6 +576,11 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 									rectw, recth);
 
 							px += !pos_is_fixed ? rectw : 0;
+							if (current_area) {
+								max_y = MAX(max_y, (*current_area).start_y+recth);
+							} else {
+								max_y = MAX(max_y, py+recth);
+							}
 							break;
 
 						case recto:
@@ -582,6 +592,8 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 								py += recty;
 							recty =	recty == 0 ? (dzen.line_height - recth)/2 :
 								(dzen.line_height - recth)/2 + recty;
+							if (current_area) 
+								(*current_area).start_y = MIN((*current_area).start_y, recty);
 							px = (rectx == 0) ? px : rectx+px;
 							/* prevent from stairs effect when rounding recty */
 							if (!((dzen.line_height - recth) % 2)) recty--;
@@ -590,6 +602,11 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 									set_posy ? py :
 									((int)recty<0 ? dzen.line_height + recty : recty), rectw-1, recth);
 							px += !pos_is_fixed ? rectw : 0;
+							if (current_area) {
+								max_y = MAX(max_y, (*current_area).start_y+recth);
+							} else {
+								max_y = MAX(max_y, py+recth);
+							}
 							break;
 
 						case circle:
@@ -744,6 +761,32 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 									get_sens_area(tval, 
 											&(*area).button, 
 											(*area).cmd);
+									if (strchr((*area).cmd, ESC_CHAR)) {
+										char * temp = malloc(sizeof((*area).cmd) - 1);
+										char * temp_opt = malloc(sizeof(strlen((*area).cmd) - (strchr((*area).cmd, ' ') - (*area).cmd)));
+										int i, c = -1, e = 0;
+										for (i = 0; i < strlen((*area).cmd) - 1; i++) {
+											if (((*area).cmd)[i+1] == ' ') {
+												c = 0;
+												continue;
+											}
+											if (c < 0) {
+												temp[e++] = ((*area).cmd)[i+1];
+											} else {
+												temp_opt[c++] = ((*area).cmd)[i+1];
+											}
+										}
+										temp[e] = '\0';
+										temp_opt[c] = '\0';
+										(*area).internal = 1;
+										(*area).internal_cmd = get_action_handler((char *)temp);
+										(*area).internal_opt = temp_opt;
+										if ((*area).internal_cmd == NULL) {
+											(*area).internal = 0;
+										}
+									} else {
+										(*area).internal = 0;
+									}
 									(*area).start_x = px;
 									(*area).start_y = py;
 									(*area).end_y = py;
@@ -755,6 +798,7 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 										(*area).win = dzen.slave_win.line[lnr];
 									}
 									(*w).sens_areas_cnt++;
+									current_area = area;
 								}
 							} else {
 									//find most recent unclosed area
@@ -765,6 +809,11 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 										(*w).sens_areas[i].end_x = px;
 										(*w).sens_areas[i].end_y = max_y;
 										(*w).sens_areas[i].active = 1;
+										/* set next active area as current, or none of them */
+										current_area = NULL;
+										for(i = (*w).sens_areas_cnt - 1; i >= 0; i--)
+											if(!(*w).sens_areas[i].active)
+												current_area = &(*w).sens_areas[i];
 								}
 							}
 							break;
